@@ -1,5 +1,6 @@
 import os
 import pygame
+import pygame_textinput
 import requests
 import sys
 
@@ -22,6 +23,7 @@ class MAP:
                                      "Point"][
                                      'pos'].split())
         self.type = 'map'
+        self.point = f'{self.lon},{self.lat}'
         self.spn = 0.01
         self.diff = 1.5
         self.response = None
@@ -29,7 +31,7 @@ class MAP:
     def update(self):
         map_request = f"http://static-maps.yandex.ru/1.x/?ll={self.lon},{self.lat}&" \
                        f"spn={self.spn},{self.spn}&" \
-                       f"l={self.type}&geocode={self.pos}"
+                       f"l={self.type}&geocode={self.pos}&pt={self.point},pm2rdm"
         response = requests.get(map_request)
         if not response:
             print("Ошибка выполнения запроса:")
@@ -37,6 +39,26 @@ class MAP:
             print("Http статус:", response.status_code, "(", response.reason, ")")
             sys.exit(1)
         self.response = response
+
+    def change_loc(self, location):
+        self.lon, self.lat = map(float,
+                                 requests.get(f'https://geocode-maps.yandex.ru/1.x/',
+                                              params={
+                                                  'apikey': '40d1649f-0493-4b70-98ba-98533de7710b',
+                                                  'geocode': f'{location}',
+                                                  'format': 'json'
+                                              }).json()[
+                                     "response"][
+                                     "GeoObjectCollection"][
+                                     "featureMember"][0][
+                                     "GeoObject"][
+                                     "Point"][
+                                     'pos'].split())
+        self.update()
+
+    def create_point(self):
+        self.point = f'{self.lon},{self.lat}'
+        self.update()
 
     def change_spn(self, diff):
         self.spn = self.spn / self.diff if diff == -1 else self.spn * self.diff
@@ -65,13 +87,16 @@ map_resp = MAP(input('Введите адрес: '))
 map_resp.change_spn(1)
 map_resp.save()
 
+
 pygame.init()
 screen = pygame.display.set_mode((600, 450))
 pygame.display.set_caption('Большая задача по Maps API')
+text = pygame_textinput.TextInputVisualizer()
 running = True
 clock = pygame.time.Clock()
 while running:
-    for event in pygame.event.get():
+    events = pygame.event.get()
+    for event in events:
         if event.type == pygame.QUIT:
             running = False
         if event.type == pygame.KEYDOWN:
@@ -93,13 +118,20 @@ while running:
             if event.key == pygame.K_LEFT:
                 map_resp.change_lon(-1)
                 map_resp.save()
+            if event.key == pygame.K_RETURN:
+                map_resp.change_loc(text.manager.value)
+                map_resp.create_point()
+                map_resp.save()
+
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 3:
                 map_resp.change_type()
                 map_resp.save()
 
+    text.update(events)
     screen.fill((0, 0, 0))
     screen.blit(pygame.image.load(map_resp.name), (0, 0))
+    screen.blit(text.surface, (10, 10))
     pygame.display.flip()
     clock.tick(60)
 pygame.quit()
