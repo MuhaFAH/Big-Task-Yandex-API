@@ -21,6 +21,7 @@ class MAP:
                                      "GeoObject"][
                                      "Point"][
                                      'pos'].split())
+        self.type = 'map'
         self.spn = 0.01
         self.diff = 1.5
         self.response = None
@@ -28,7 +29,7 @@ class MAP:
     def update(self):
         map_request = f"http://static-maps.yandex.ru/1.x/?ll={self.lon},{self.lat}&" \
                        f"spn={self.spn},{self.spn}&" \
-                       f"l=map&geocode={self.pos}"
+                       f"l={self.type}&geocode={self.pos}"
         response = requests.get(map_request)
         if not response:
             print("Ошибка выполнения запроса:")
@@ -48,6 +49,11 @@ class MAP:
 
     def change_lat(self, diff):
         self.lat += diff * 0.1
+        self.update()
+
+    def change_type(self):
+        types = ['map', 'sat', 'sat,skl']
+        self.type = types[(types.index(self.type) + 1) % 3]
         self.update()
 
     def save(self):
@@ -87,6 +93,11 @@ while running:
             if event.key == pygame.K_LEFT:
                 map_resp.change_lon(-1)
                 map_resp.save()
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 3:
+                map_resp.change_type()
+                map_resp.save()
+
     screen.fill((0, 0, 0))
     screen.blit(pygame.image.load(map_resp.name), (0, 0))
     pygame.display.flip()
