@@ -30,8 +30,8 @@ class MAP:
 
     def update(self):
         map_request = f"http://static-maps.yandex.ru/1.x/?ll={self.lon},{self.lat}&" \
-                       f"spn={self.spn},{self.spn}&" \
-                       f"l={self.type}&geocode={self.pos}&pt={self.point},pm2rdm"
+                      f"spn={self.spn},{self.spn}&" \
+                      f"l={self.type}&geocode={self.pos}&pt={self.point},pm2rdm"
         response = requests.get(map_request)
         if not response:
             print("Ошибка выполнения запроса:")
@@ -56,6 +56,7 @@ class MAP:
                                      'pos'].split())
         self.update()
 
+    # Ничего не изменилось, уже было сделано в №5
     def create_point(self):
         self.point = f'{self.lon},{self.lat}'
         self.update()
@@ -86,7 +87,6 @@ class MAP:
 map_resp = MAP(input('Введите адрес: '))
 map_resp.change_spn(1)
 map_resp.save()
-
 
 pygame.init()
 screen = pygame.display.set_mode((600, 450))
