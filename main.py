@@ -26,9 +26,9 @@ class MAP:
         self.type = 'map'
         self.point = f'{self.lon},{self.lat}'
         address = requests.get('https://geocode-maps.yandex.ru/1.x/',
-                           params={'apikey': '40d1649f-0493-4b70-98ba-98533de7710b',
-                                   'geocode': f'{self.lon},{self.lat}',
-                                   'format': 'json'}).json()[
+                               params={'apikey': '40d1649f-0493-4b70-98ba-98533de7710b',
+                                       'geocode': f'{self.lon},{self.lat}',
+                                       'format': 'json'}).json()[
             'response'][
             'GeoObjectCollection'][
             'featureMember'][0][
@@ -112,6 +112,7 @@ class MAP:
             'metaDataProperty'][
             'GeocoderMetaData'][
             'text']
+        # было уже сделано в 9 части задания.
         try:
             index = request[
                 'response'][
