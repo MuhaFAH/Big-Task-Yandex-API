@@ -37,6 +37,8 @@ class MAP:
             'GeocoderMetaData'][
             'text']
         self.address = pygame.font.SysFont('Impact', 19).render(f"Адрес: {address}", False, (0, 0, 0))
+        self.index = pygame.font.SysFont('Impact', 19).render(f"Индекс: ", False, (255, 0, 0))
+        self.show_index = False
         self.spn = 0.01
         self.diff = 1.5
         self.response = None
@@ -98,10 +100,11 @@ class MAP:
         self.update()
 
     def change_address(self):
-        address = requests.get('https://geocode-maps.yandex.ru/1.x/',
+        request = requests.get('https://geocode-maps.yandex.ru/1.x/',
                                params={'apikey': '40d1649f-0493-4b70-98ba-98533de7710b',
                                        'geocode': f'{self.lon},{self.lat}',
-                                       'format': 'json'}).json()[
+                                       'format': 'json'}).json()
+        address = request[
             'response'][
             'GeoObjectCollection'][
             'featureMember'][0][
@@ -109,7 +112,20 @@ class MAP:
             'metaDataProperty'][
             'GeocoderMetaData'][
             'text']
+        try:
+            index = request[
+                'response'][
+                'GeoObjectCollection'][
+                'featureMember'][0][
+                'GeoObject'][
+                'metaDataProperty'][
+                'GeocoderMetaData'][
+                'Address'][
+                'postal_code']
+        except KeyError:
+            index = 'индекса нет'
         self.address = pygame.font.SysFont('Impact', 19).render(f"Адрес: {address}", False, (0, 0, 0))
+        self.index = pygame.font.SysFont('Impact', 19).render(f"Индекс: {index}", False, (255, 0, 0))
 
     def save(self):
         with open(self.name, "wb") as file:
@@ -129,7 +145,7 @@ screen = pygame.display.set_mode((600, 450))
 pygame.display.set_caption('Большая задача по Maps API')
 text = pygame_textinput.TextInputVisualizer()
 manager = pygame_gui.UIManager((600, 450))
-button, btn_text, btn_weight, btn_height = [], [['искать', 'сброс']], 100, 50
+button, btn_text, btn_weight, btn_height = [], [['искать', 'сброс', 'индекс']], 100, 50
 for i in range(len(btn_text)):
     for j in range(len(btn_text[i])):
         button.append([])
@@ -159,6 +175,9 @@ while running:
                             text.manager.value = ''
                             map_resp.create_point()
                             map_resp.save()
+                        elif button[i][j].text == 'индекс':
+                            map_resp.show_index = True if not map_resp.show_index else False
+                            map_resp.change_address()
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_PAGEUP:
                 map_resp.change_spn(1)
@@ -189,6 +208,8 @@ while running:
     screen.blit(pygame.image.load(map_resp.name), (0, 0))
     screen.blit(text.surface, (10, 10))
     screen.blit(map_resp.address, (10, 420))
+    if map_resp.show_index:
+        screen.blit(map_resp.index, (10, 400))
     manager.draw_ui(screen)
     pygame.display.flip()
     clock.tick(60)
