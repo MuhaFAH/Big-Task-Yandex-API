@@ -25,6 +25,18 @@ class MAP:
                                      'pos'].split())
         self.type = 'map'
         self.point = f'{self.lon},{self.lat}'
+        address = requests.get('https://geocode-maps.yandex.ru/1.x/',
+                           params={'apikey': '40d1649f-0493-4b70-98ba-98533de7710b',
+                                   'geocode': f'{self.lon},{self.lat}',
+                                   'format': 'json'}).json()[
+            'response'][
+            'GeoObjectCollection'][
+            'featureMember'][0][
+            'GeoObject'][
+            'metaDataProperty'][
+            'GeocoderMetaData'][
+            'text']
+        self.address = pygame.font.SysFont('Impact', 19).render(f"Адрес: {address}", False, (0, 0, 0))
         self.spn = 0.01
         self.diff = 1.5
         self.response = None
@@ -57,6 +69,7 @@ class MAP:
                                          "Point"][
                                          'pos'].split())
             self.update()
+            self.change_address()
         except (IndexError, KeyError):
             pass
 
@@ -72,15 +85,31 @@ class MAP:
     def change_lon(self, diff):
         self.lon += diff * 0.1
         self.update()
+        self.change_address()
 
     def change_lat(self, diff):
         self.lat += diff * 0.1
         self.update()
+        self.change_address()
 
     def change_type(self):
         types = ['map', 'sat', 'sat,skl']
         self.type = types[(types.index(self.type) + 1) % 3]
         self.update()
+
+    def change_address(self):
+        address = requests.get('https://geocode-maps.yandex.ru/1.x/',
+                               params={'apikey': '40d1649f-0493-4b70-98ba-98533de7710b',
+                                       'geocode': f'{self.lon},{self.lat}',
+                                       'format': 'json'}).json()[
+            'response'][
+            'GeoObjectCollection'][
+            'featureMember'][0][
+            'GeoObject'][
+            'metaDataProperty'][
+            'GeocoderMetaData'][
+            'text']
+        self.address = pygame.font.SysFont('Impact', 19).render(f"Адрес: {address}", False, (0, 0, 0))
 
     def save(self):
         with open(self.name, "wb") as file:
@@ -95,11 +124,12 @@ map_resp.change_spn(1)
 map_resp.save()
 
 pygame.init()
+pygame.font.init()
 screen = pygame.display.set_mode((600, 450))
 pygame.display.set_caption('Большая задача по Maps API')
 text = pygame_textinput.TextInputVisualizer()
 manager = pygame_gui.UIManager((600, 450))
-button, btn_text, btn_weight, btn_height = [], [['искать'], ['сброс']], 100, 50
+button, btn_text, btn_weight, btn_height = [], [['искать', 'сброс']], 100, 50
 for i in range(len(btn_text)):
     for j in range(len(btn_text[i])):
         button.append([])
@@ -158,6 +188,7 @@ while running:
     screen.fill((0, 0, 0))
     screen.blit(pygame.image.load(map_resp.name), (0, 0))
     screen.blit(text.surface, (10, 10))
+    screen.blit(map_resp.address, (10, 420))
     manager.draw_ui(screen)
     pygame.display.flip()
     clock.tick(60)
