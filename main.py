@@ -11,6 +11,37 @@ LON_STEP, LAT_STEP = 0.02, 0.008
 CONVERT_X, CONVERT_Y = 0.0000428, 0.0000428
 
 
+def lonlat_distance(a, b):
+    a = [float(x) for x in a.split(',')] if type(a) == str else a
+    b = [float(y) for y in b.split(',')] if type(b) == str else b
+    degree_to_meters_factor = 111 * 1000
+    a_lon, a_lat = a
+    b_lon, b_lat = b
+    radians_lattitude = math.radians((a_lat + b_lat) / 2.)
+    lat_lon_factor = math.cos(radians_lattitude)
+    dx = abs(a_lon - b_lon) * degree_to_meters_factor * lat_lon_factor
+    dy = abs(a_lat - b_lat) * degree_to_meters_factor
+    distance = math.sqrt(dx * dx + dy * dy)
+    return distance
+
+
+def close_business(coordinates):
+    search_api_server = "https://search-maps.yandex.ru/v1/"
+    search_params = {
+        "apikey": "dda3ddba-c9ea-4ead-9010-f43fbc15c6e3",
+        "text": 'организация',
+        "lang": 'ru_RU',
+        "spn": '0.001,0.001',
+        "ll": coordinates,
+        "type": "biz"
+    }
+    response = requests.get(search_api_server, params=search_params)
+    try:
+        return list(filter(lambda x: lonlat_distance(x['geometry']['coordinates'], map(float, coordinates.split(','))) < 500, response.json()["features"]))[0]
+    except IndexError:
+        return None
+
+
 def degeocode(coords):
     request = 'http://geocode-maps.yandex.ru/1.x/'
     params = {
@@ -76,39 +107,45 @@ class MAP:
             'metaDataProperty'][
             'GeocoderMetaData'][
             'text']
+        self.business = pygame.font.SysFont('Impact', 19).render(f"1", False, (0, 0, 0))
         self.address = pygame.font.SysFont('Impact', 19).render(f"Адрес: {address}", False, (0, 0, 0))
         self.index = pygame.font.SysFont('Impact', 19).render(f"Индекс: ", False, (255, 0, 0))
+        self.show_business = False
         self.show_index = False
         self.zoom = 15
 
-    def move(self, event):
-        if event.key == pygame.K_PAGEUP and self.zoom < 19:
+    def move(self, event_list):
+        if event_list.key == pygame.K_PAGEUP and self.zoom < 19:
             self.zoom += 1
-            update(map_resp)
-        elif event.key == pygame.K_PAGEDOWN and self.zoom > 2:
+            update(self)
+        elif event_list.key == pygame.K_PAGEDOWN and self.zoom > 2:
             self.zoom -= 1
-            update(map_resp)
-        elif event.key == pygame.K_LEFT:
+            update(self)
+        elif event_list.key == pygame.K_LEFT:
             self.lon -= LON_STEP * math.pow(2, 13 - self.zoom)
-            update(map_resp)
-        elif event.key == pygame.K_RIGHT:
+            update(self)
+        elif event_list.key == pygame.K_RIGHT:
             self.lon += LON_STEP * math.pow(2, 13 - self.zoom)
-            update(map_resp)
-        elif event.key == pygame.K_UP and self.lat < 85:
+            update(self)
+        elif event_list.key == pygame.K_UP and self.lat < 85:
             self.lat += LAT_STEP * math.pow(2, 13 - self.zoom)
-            update(map_resp)
-        elif event.key == pygame.K_DOWN and self.lat > -85:
+            update(self)
+        elif event_list.key == pygame.K_DOWN and self.lat > -85:
             self.lat -= LAT_STEP * math.pow(2, 13 - self.zoom)
-            update(map_resp)
-        elif event.key == pygame.K_RETURN:
-            map_resp.search(change_loc(text.manager.value), mouse=False)
-            update(map_resp)
+            update(self)
+        elif event_list.key == pygame.K_RETURN:
+            self.search(change_loc(text.manager.value), mouse=False)
+            self.show_business = False
+            update(self)
+        elif event_list.key == pygame.K_RSHIFT:
+            self.change_type()
+            update(self)
         if self.lon > 180:
             self.lon -= 360
-            update(map_resp)
+            update(self)
         if self.lon < -180:
             self.lon += 360
-            update(map_resp)
+            update(self)
 
     def recoords(self, pos):
         dy = 225 - pos[1]
@@ -119,22 +156,45 @@ class MAP:
         return lx, ly
 
     def search(self, pos, mouse=False):
-        self.point = self.recoords(pos) if mouse else pos
-        address = degeocode(f'{self.point[0]},{self.point[1]}')
-        self.address = pygame.font.SysFont('Impact', 19).render(
-            f"Адрес: {address['metaDataProperty']['GeocoderMetaData']['text'] if address else 'нет'}", False, (0, 0, 0))
-        self.index = pygame.font.SysFont('Impact', 19).render(
-            f"Индекс: {address['metaDataProperty']['GeocoderMetaData']['Address'].get('postal_code') if address else 'нет'}",
-            False, (255, 0, 0))
-        if not mouse:
-            self.lon, self.lat = self.point[0], self.point[1]
+        if pos:
+            self.point = self.recoords(pos) if mouse else pos
+            address = degeocode(f'{self.point[0]},{self.point[1]}')
+            self.address = pygame.font.SysFont('Impact', 19).render(
+                f"Адрес: "
+                f"{address['metaDataProperty']['GeocoderMetaData']['text'] if address else 'нет'}", False, (0, 0, 0))
+            self.index = pygame.font.SysFont('Impact', 19).render(
+                f"Индекс: {address['metaDataProperty']['GeocoderMetaData']['Address'].get('postal_code') if address else 'нет'}",
+                False, (255, 0, 0))
+            if not mouse:
+                self.lon, self.lat = self.point[0], self.point[1]
+        else:
+            self.address = pygame.font.SysFont('Impact', 19).render(
+                f"Адрес: НЕ НАЙДЕНО", False, (0, 0, 0))
+            self.index = pygame.font.SysFont('Impact', 19).render(
+                f"Индекс: НЕ НАЙДЕНО",
+                False, (255, 0, 0))
+
+    def search_business(self, pos):
+        self.point = self.recoords(pos)
+        address = close_business(f'{self.point[0]},{self.point[1]}')
+        if address:
+            self.point = tuple(address['geometry']['coordinates'])
+            self.business = pygame.font.SysFont('Impact', 19).render(
+                f"Название: {address['properties']['CompanyMetaData']['name']}", False, (0, 0, 0))
+            self.address = pygame.font.SysFont('Impact', 19).render(
+                f"Адрес: {address['properties']['CompanyMetaData']['address'] if address else 'нет'}", False, (0, 0, 0))
+        else:
+            self.business = pygame.font.SysFont('Impact', 19).render(
+                f"Название: НЕ НАЙДЕНО", False, (0, 0, 0))
+            self.address = pygame.font.SysFont('Impact', 19).render(
+                f"Адрес: НЕ НАЙДЕНО", False, (0, 0, 0))
 
     def change_type(self):
         types = ['map', 'sat', 'sat,skl']
         self.type = types[(types.index(self.type) + 1) % 3]
 
 
-def update(yan_map: MAP):
+def update(yan_map: MAP, business=False):
     map_request = 'http://static-maps.yandex.ru/1.x/'
     params = {
         'll': f'{yan_map.lon},{yan_map.lat}',
@@ -142,6 +202,8 @@ def update(yan_map: MAP):
         'l': yan_map.type,
         'pt': f'{yan_map.point[0]},{yan_map.point[1]},pm2grm'
     }
+    if business:
+        params['pt'] = f'{yan_map.point[0]},{yan_map.point[1]},pm2rdm'
     response = requests.get(map_request, params=params)
     if not response:
         print(f"ОШИБКА: {map_request}")
@@ -153,9 +215,9 @@ def update(yan_map: MAP):
 
 
 try:
-    map_resp = MAP(input('Введите адрес: '))
+    self = MAP(input('Введите адрес: '))
 except KeyError:
-    map_resp = MAP('Москва')
+    self = MAP('Москва')
 
 pygame.init()
 pygame.font.init()
@@ -175,8 +237,7 @@ for i in range(len(btn_text)):
         )
 running = True
 clock = pygame.time.Clock()
-m_pressed = False
-update(map_resp)
+update(self)
 while running:
     events = pygame.event.get()
     for event in events:
@@ -188,35 +249,40 @@ while running:
                 for j in range(len(button[i])):
                     if event.ui_element == button[i][j]:
                         if button[i][j].text == 'искать' and text.manager.value:
-                            map_resp.search(change_loc(text.manager.value), mouse=False)
-                            update(map_resp)
+                            self.search(change_loc(text.manager.value), mouse=False)
+                            self.show_business = False
+                            update(self)
                         elif button[i][j].text == 'сброс':
-                            map_resp.search(change_loc('Москва'), mouse=False)
-                            update(map_resp)
+                            self.search(change_loc('Москва'), mouse=False)
+                            self.show_business = False
+                            update(self)
                             text.manager.value = ''
                         elif button[i][j].text == 'индекс':
-                            map_resp.show_index = True if not map_resp.show_index else False
-                            update(map_resp)
+                            self.show_index = True if not self.show_index else False
+                            update(self)
         elif event.type == pygame.KEYUP:
-            map_resp.move(event)
+            self.move(event)
         elif event.type == pygame.MOUSEBUTTONUP:
-            if not m_pressed:
-                if event.button == 1:
-                    map_resp.search(event.pos, mouse=True)
-                    update(map_resp)
-            m_pressed = False
+            if event.button == 1:
+                self.search(event.pos, mouse=True)
+                self.show_business = False
+                update(self)
             if event.button == 3:
-                map_resp.change_type()
-                update(map_resp)
+                self.search_business(event.pos)
+                self.show_business = True
+                self.show_index = False
+                update(self, business=True)
         manager.process_events(event)
     manager.update(clock.tick(60) / 1000.0)
     text.update(events)
     screen.fill((0, 0, 0))
-    screen.blit(pygame.image.load(map_resp.name), (0, 0))
+    screen.blit(pygame.image.load(self.name), (0, 0))
     screen.blit(text.surface, (10, 10))
-    screen.blit(map_resp.address, (10, 420))
-    if map_resp.show_index:
-        screen.blit(map_resp.index, (10, 400))
+    screen.blit(self.address, (10, 420))
+    if self.show_business:
+        screen.blit(self.business, (10, 380))
+    if self.show_index:
+        screen.blit(self.index, (10, 400))
     manager.draw_ui(screen)
     pygame.display.flip()
     clock.tick(60)
